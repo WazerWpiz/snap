@@ -46,7 +46,11 @@ snap/
 ## Fitur
 
 - Pilih provider (ChatGPT, Claude, Gemini, Kimi, GLM, Arena, Meta AI, Ptero, Grok, Mistral, Qwen, DeepSeek)
-  dan buka beberapa tab sekaligus. Tab yang tidak tampil otomatis dijeda (`onPause`) agar hemat memori & baterai.
+  dan buka beberapa tab sekaligus. Tab yang tidak tampil otomatis dijeda (`onPause`) agar hemat memori & baterai,
+  dan renderer-nya diturunkan prioritasnya supaya tab aktif tetap responsif.
+- Injeksi ekstensi dibuat hemat: hanya shim (~4 KB) dan hook jaringan yang berjalan di `document-start`.
+  Bundle `core/*` + `providers/*` (~420–480 KB) disuntikkan setelah frame pertama halaman provider digambar,
+  jadi skrip situs tidak lagi menunggu parsing JS besar sebelum render.
 - Workspace: folder privat aplikasi, atau folder pilihan lewat Storage Access Framework (indikator di bar atas).
 - Manajer MCP: server workspace bawaan (aktif/nonaktif), tambah/hapus/toggle server remote HTTP, tes koneksi.
 - Pengaturan: tema (sistem/terang/gelap), kategori tool, konfirmasi per kategori, override per tool

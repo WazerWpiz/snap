@@ -39,13 +39,22 @@ class ChatTab(val id: String, val site: ProviderSite, container: AppContainer) {
     }
 
     /**
-     * Jeda/lanjutkan tab: WebView non-aktif berhenti menjalankan JS, animasi, dan video.
+     * Jeda/lanjutkan tab: WebView non-aktif berhenti menjalankan JS, animasi, dan video,
+     * dan renderer-nya diturunkan prioritasnya supaya tab aktif tidak berebut CPU.
      * Sengaja hanya onPause/onResume (per-view); pauseTimers()/resumeTimers() bersifat
      * global dan akan menjeda SEMUA WebView, termasuk tab yang sedang tampil.
      */
     fun setActive(active: Boolean) {
         val current = view ?: return
-        if (active) current.onResume() else current.onPause()
+        if (active) {
+            current.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
+            current.onResume()
+        } else {
+            // waivedWhenNotVisible=false: renderer tab latar tidak dibunuh, jadi saat
+            // tab dibuka lagi halamannya tidak perlu dimuat ulang (tidak terasa lambat).
+            current.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, false)
+            current.onPause()
+        }
     }
 
     fun destroy() {

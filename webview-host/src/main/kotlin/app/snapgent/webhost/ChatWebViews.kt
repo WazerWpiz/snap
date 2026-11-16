@@ -7,6 +7,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -50,8 +51,10 @@ object ChatWebViews {
                 site.allowedOrigins,
             )
         }
-        WebViewCompat.addDocumentStartJavaScript(view, ScriptBundle.startupScript(context, site), site.allowedOrigins)
-        view.webViewClient = GuardedWebViewClient(context, host)
+        // Hanya shim kecil di document-start. Bundle isolasi (~480 KB) disuntikkan setelah
+        // halaman tampil oleh GuardedWebViewClient; lihat catatan di ScriptBundle.
+        WebViewCompat.addDocumentStartJavaScript(view, ScriptBundle.shim(context), site.allowedOrigins)
+        view.webViewClient = GuardedWebViewClient(context, site, host)
         // Tanpa ChromeClient sendiri, Permintaan mikrofon (input suara di situs AI)
         // ditolak diam-diam oleh WebChromeClient bawaan.
         view.webChromeClient = ChatChromeClient()
@@ -80,12 +83,56 @@ private class ChatChromeClient : WebChromeClient() {
 /** Halaman web tetap di WebView; skema lain (intent:, mailto:, dll.) dibuka aplikasi lain. */
 class GuardedWebViewClient(
     private val context: Context,
+    private val site: ProviderSite,
     private val host: ExtensionHost,
 ) : WebViewClient() {
 
+    /** Naik setiap navigasi dokumen utama; mencegah injeksi ganda pada dokumen yang sama. */
+    private var navigation = 0
+    private var injectedNavigation = -1
+    private var bootScript: String? = null
+
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         host.onPageStarted(url)
+        navigation++
         super.onPageStarted(view, url, favicon)
+        val webView = view ?: return
+        val token = navigation
+        // Jaring pengaman: sebagian situs chat menahan event "load" (streaming/polling),
+        // jadi onPageFinished bisa tidak datang. Injeksi tetap dilakukan setelah 5 detik.
+        webView.postDelayed({ injectIfNeeded(webView, token) }, 5_000L)
+    }
+
+    override fun onPageFinished(view: WebView?, url: String?) {
+        super.onPageFinished(view, url)
+        val webView = view ?: return
+        val token = navigation
+        // Tunggu frame pertama halaman benar-benar digambar, lalu suntik di frame berikutnya.
+        // Parsing ~480 KB bundle tidak boleh berebut main thread dengan render/hydration situs.
+        webView.postVisualStateCallback(
+            SystemClock.uptimeMillis(),
+            object : WebView.VisualStateCallback() {
+                override fun onComplete(requestId: Long) {
+                    webView.post { injectIfNeeded(webView, token) }
+                }
+            },
+        )
+        // Cadangan bila WebView tidak pernah menggambar (mis. tab langsung disembunyikan).
+        webView.postDelayed({ injectIfNeeded(webView, token) }, 1_200L)
+    }
+
+    private fun injectIfNeeded(webView: WebView, token: Int) {
+        if (token != navigation || injectedNavigation == token) return
+        // Periksa origin saat injeksi: pengguna bisa saja sudah pindah halaman.
+        if (webView.url?.let(::isAllowed) != true) return
+        injectedNavigation = token
+        val script = bootScript ?: ScriptBundle.bootScript(context, site).also { bootScript = it }
+        webView.evaluateJavascript(script, null)
+    }
+
+    private fun isAllowed(url: String): Boolean {
+        val origin = ExtensionHost.originOf(url) ?: return false
+        return origin in site.allowedOrigins
     }
 
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
