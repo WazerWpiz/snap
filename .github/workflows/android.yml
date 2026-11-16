@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Android
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validasi Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Siapkan JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Siapkan Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Tentukan versi dan keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION_NAME=0.1.0-dev" >> "$GITHUB_ENV"
+          fi
+          echo "VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          if [ -n "${KEYSTORE_BASE64}" ]; then
+            KS="${RUNNER_TEMP}/snapgent-release.jks"
+            echo "${KEYSTORE_BASE64}" | base64 --decode > "$KS"
+            echo "SNAPGENT_KEYSTORE_PATH=${KS}" >> "$GITHUB_ENV"
+            echo "Keystore release dipakai."
+          else
+            echo "KEYSTORE_BASE64 kosong: release ditandatangani debug keystore."
+          fi
+
+      - name: Lint, test, dan build APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -o pipefail
+          chmod +x ./gradlew
+          # --continue: semua tahap dijalankan walau ada yang gagal, agar error terlihat sekaligus.
+          ./gradlew --no-daemon --continue lintDebug 2>&1 | tee build.log
+          ./gradlew --no-daemon --continue test testDebugUnitTest 2>&1 | tee -a build.log
+          ./gradlew --no-daemon --continue assembleDebug 2>&1 | tee -a build.log
+          ./gradlew --no-daemon --continue assembleRelease 2>&1 | tee -a build.log
+
+      - name: Ringkas error build (anotasi)
+        if: failure()
+        run: |
+          {
+            grep -E '^e: ' build.log
+            grep -E -A4 'What went wrong' build.log
+            grep -E 'AAPT|error:|Could not |Caused by|FAILURE: ' build.log
+          } | sed -e 's#file:///home/runner/work/[^/]*/[^/]*/##' -e 's#^e: ##' \
+            | awk '!seen[$0]++' | head -150 \
+            | while IFS= read -r line; do echo "::error::${line}"; done
+
+      - name: Unggah log build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ github.run_number }}
+          path: build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Unggah APK sebagai artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapgent-apk-${{ github.run_number }}
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Rilis GitHub (tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Snapgent ${{ env.VERSION_NAME }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

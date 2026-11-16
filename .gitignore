@@ -1,0 +1,17 @@
+# Gradle / Android build output
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+.kotlin/
+local.properties
+captures/
+*.iml
+.idea/
+.DS_Store
+
+# Secrets: never commit keystores or signing properties
+*.jks
+*.keystore
+keystore.properties
+secrets/
+.env
