@@ -71,9 +71,12 @@ jobs:
       - name: Ringkas error build (anotasi)
         if: failure()
         run: |
-          grep -E '^e: |What went wrong|^> Task|error:|FAILURE|Could not |Exception' build.log \
-            | sed -e 's#file:///home/runner/work/[^/]*/[^/]*/##' -e 's#^e: ##' \
-            | head -120 \
+          {
+            grep -E '^e: ' build.log
+            grep -E -A4 'What went wrong' build.log
+            grep -E 'AAPT|error:|Could not |Caused by|FAILURE: ' build.log
+          } | sed -e 's#file:///home/runner/work/[^/]*/[^/]*/##' -e 's#^e: ##' \
+            | awk '!seen[$0]++' | head -150 \
             | while IFS= read -r line; do echo "::error::${line}"; done
 
       - name: Unggah log build
