@@ -132,9 +132,11 @@ Pengaturan dilakukan sepenuhnya di dalam aplikasi (tab **Pengaturan** dan **MCP*
 
 ## Status verifikasi
 
-Sandbox pengembangan tidak memiliki JDK 17 maupun Android SDK, sehingga build lokal **belum diverifikasi**.
-Verifikasi resmi dilakukan oleh CI pada setiap push. Tulis ulang kode di tiap modul dibuat agar mengikuti
-API yang sudah ada, tetapi error kompilasi kecil tetap mungkin muncul pada build pertama.
+- Build terakhir di CI (run `43798706136`, commit `4b04b84`): **hijau** untuk `lintDebug`, `test testDebugUnitTest`,
+  `assembleDebug`, dan `assembleRelease`. APK diunggah sebagai artifact.
+- Sandbox pengembangan tidak memiliki JDK 17 maupun Android SDK, jadi verifikasi resmi dilakukan di CI.
+- Rilis tag `v*` (langkah GitHub Release) belum diuji end-to-end.
+- Perilaku runtime di perangkat (WebView per provider, login, SAF) belum diuji di perangkat nyata.
 
 ## Lisensi
 
