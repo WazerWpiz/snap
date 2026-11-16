@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Snapgent</string>
+    <string name="session_channel_name">Sesi Snapgent</string>
+    <string name="session_running">Sesi Snapgent tetap berjalan di latar</string>
+</resources>
