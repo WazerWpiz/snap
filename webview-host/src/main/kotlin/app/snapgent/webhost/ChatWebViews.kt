@@ -52,12 +52,29 @@ object ChatWebViews {
         }
         WebViewCompat.addDocumentStartJavaScript(view, ScriptBundle.startupScript(context, site), site.allowedOrigins)
         view.webViewClient = GuardedWebViewClient(context, host)
-        view.webChromeClient = WebChromeClient()
+        // Tanpa ChromeClient sendiri, Permintaan mikrofon (input suara di situs AI)
+        // ditolak diam-diam oleh WebChromeClient bawaan.
+        view.webChromeClient = ChatChromeClient()
         host.attachView(view)
         return view
     }
 
     const val BRIDGE_NAME = "SnapgentAndroid"
+}
+
+/**
+ * Menyetujui HANYA permintaan mikrofon (input suara pada situs AI chat) dan
+ * menolak sisanya (kamera, geolocation) agar privasi tetap terbatas.
+ */
+private class ChatChromeClient : WebChromeClient() {
+    override fun onPermissionRequest(request: android.webkit.PermissionRequest) {
+        val granted = request.resources?.filter { it == android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE }
+        if (granted.isNullOrEmpty()) {
+            request.deny()
+        } else {
+            request.grant(granted.toTypedArray())
+        }
+    }
 }
 
 /** Halaman web tetap di WebView; skema lain (intent:, mailto:, dll.) dibuka aplikasi lain. */

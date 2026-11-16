@@ -3,4 +3,16 @@
     <string name="app_name">Snapgent</string>
     <string name="session_channel_name">Sesi Snapgent</string>
     <string name="session_running">Sesi Snapgent tetap berjalan di latar</string>
+
+    <!-- Keterangan (aksesibilitas) ikon navigasi & aksi -->
+    <string name="nav_chat">Chat</string>
+    <string name="nav_mcp">MCP</string>
+    <string name="nav_settings">Pengaturan</string>
+    <string name="nav_logs">Log</string>
+    <string name="action_add_provider">Buka provider</string>
+    <string name="action_reload_tab">Muat ulang tab</string>
+    <string name="action_close_tab">Tutup tab %s</string>
+
+    <!-- Bisikan status notifikasi layanan latar -->
+    <string name="notif_permission_denied">Notifikasi diblokir; layanan latar tetap berjalan tanpa notifikasi terlihat.</string>
 </resources>

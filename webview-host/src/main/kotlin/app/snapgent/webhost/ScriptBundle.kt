@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Menyusun script yang disuntikkan ke WebView: shim chrome.* + bundle core/providers/main
 // yang dijalankan setelah DOM siap (meniru document_idle pada content script extension).
+// Hasil build di-cache (LRU kecil) supaya membuka/menutup tab tidak membaca aset
+// berulang kali dari disk.
 package app.snapgent.webhost
 
 import android.content.Context
@@ -8,10 +10,30 @@ import org.json.JSONObject
 
 object ScriptBundle {
 
-    fun readAsset(context: Context, path: String): String =
-        context.assets.open(path).bufferedReader(Charsets.UTF_8).use { it.readText() }
+    private const val ASSET_CACHE_SIZE = 16
+    private const val STARTUP_CACHE_SIZE = 4
 
-    fun startupScript(context: Context, site: ProviderSite): String {
+    private val assetCache = object : LinkedHashMap<String, String>(ASSET_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > ASSET_CACHE_SIZE
+    }
+
+    private val startupCache = object : LinkedHashMap<String, String>(STARTUP_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > STARTUP_CACHE_SIZE
+    }
+
+    fun readAsset(context: Context, path: String): String = synchronized(assetCache) {
+        assetCache.getOrPut(path) {
+            context.assets.open(path).bufferedReader(Charsets.UTF_8).use { it.readText() }
+        }
+    }
+
+    fun startupScript(context: Context, site: ProviderSite): String = synchronized(startupCache) {
+        startupCache.getOrPut(site.id) { build(context, site) }
+    }
+
+    private fun build(context: Context, site: ProviderSite): String {
         val shim = readAsset(context, "snapgent-android/shim.js")
         val css = site.styleFiles.joinToString("\n") { readAsset(context, "${SiteCatalog.ROOT}/$it") }
         val sources = site.isolatedScripts.joinToString("\n;\n") { readAsset(context, "${SiteCatalog.ROOT}/$it") }

@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FF111111</color>
+    <!-- Latar jendela: dipakai sebelum Compose siap agar tidak ada kedip putih
+         saat aplikasi dibuka dalam mode gelap. -->
+    <color name="window_background">#FFFBFDFA</color>
 </resources>

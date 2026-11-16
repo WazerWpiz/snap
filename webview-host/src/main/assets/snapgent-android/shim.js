@@ -29,18 +29,24 @@
 
   function send(message, cb) {
     var id = nextId++;
-    if (typeof cb === "function") pending[id] = cb;
-    if (!native) {
-      delete pending[id];
-      return deferCallback(cb, { ok: false, kind: "disconnected", error: "bridge Android tidak tersedia" });
-    }
-    try {
-      native.request(id, JSON.stringify(message));
-    } catch (e) {
-      delete pending[id];
-      return deferCallback(cb, { ok: false, kind: "disconnected", error: String(e) });
-    }
-    return undefined;
+    // Chrome MV3: sendMessage selalu mengembalikan Promise; callback tetap didukung.
+    return new Promise(function (resolve) {
+      var done = function (resp) {
+        if (typeof cb === "function") cb(resp);
+        resolve(resp);
+      };
+      if (!native) {
+        done({ ok: false, kind: "disconnected", error: "bridge Android tidak tersedia" });
+        return;
+      }
+      pending[id] = done;
+      try {
+        native.request(id, JSON.stringify(message));
+      } catch (e) {
+        delete pending[id];
+        done({ ok: false, kind: "disconnected", error: String(e) });
+      }
+    });
   }
 
   window.__snapgentResolve = function (id, json) {
@@ -112,7 +118,14 @@
       return deferCallback(cb, undefined);
     },
     remove: function (keys, cb) {
-      selectKeys(keys).forEach(function (key) { delete cache[key]; });
+      var removed = selectKeys(keys).filter(function (key) {
+        return Object.prototype.hasOwnProperty.call(cache, key);
+      });
+      removed.forEach(function (key) { delete cache[key]; });
+      // Persistensikan penghapusan: tanpanya kunci muncul lagi setelah muat ulang.
+      if (native && removed.length) {
+        try { native.storageRemove(JSON.stringify(removed)); } catch (e) { console.error("[snapgent-android]", e); }
+      }
       return deferCallback(cb, undefined);
     }
   };

@@ -3,7 +3,10 @@
 // system prompt, layanan latar, dan impor/ekspor konfigurasi.
 package app.snapgent.android.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -34,11 +37,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import app.snapgent.android.AppContainer
+import app.snapgent.android.BuildConfig
+import app.snapgent.android.R
 import app.snapgent.android.service.SessionService
 import app.snapgent.mcp.ToolCategory
 import app.snapgent.settings.AppSettings
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -51,9 +58,20 @@ fun SettingsScreen(container: AppContainer) {
     val scope = rememberCoroutineScope()
     var message by remember { mutableStateOf<String?>(null) }
     var promptDraft by remember { mutableStateOf<String?>(null) }
+    // Dinaikkan setiap kali webStorage bisa berubah dari luar (impor konfigurasi)
+    // supaya draf prompt tidak menimpa nilai yang baru diimpor.
+    var promptReload by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(promptReload) {
         promptDraft = (container.webStorage.get(PROMPT_KEY) as? JsonPrimitive)?.content.orEmpty()
+    }
+
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        message = if (granted) {
+            "Notifikasi diizinkan."
+        } else {
+            context.getString(R.string.notif_permission_denied)
+        }
     }
 
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -85,6 +103,10 @@ fun SettingsScreen(container: AppContainer) {
                     val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
                         ?: error("file tidak dapat dibaca")
                     container.importConfig(text)
+                    // Terapkan efek samping impor: layanan latar + draf system prompt.
+                    val imported = container.settingsRepo.flow.first()
+                    SessionService.sync(context, imported.keepAlive)
+                    promptReload++
                 }.onSuccess { message = "Konfigurasi diimpor." }.onFailure { message = "Impor gagal: ${it.message}" }
             }
         }
@@ -190,6 +212,13 @@ fun SettingsScreen(container: AppContainer) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Jaga sesi tetap hidup (foreground service)", modifier = Modifier.weight(1f))
             Switch(checked = settings.keepAlive, onCheckedChange = { on ->
+                if (on) {
+                    // Android 13+: minta izin notifikasi agar status layanan terlihat.
+                    val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                        PackageManager.PERMISSION_GRANTED
+                    if (needsPermission) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
                 SessionService.sync(context, on)
                 scope.launch { container.settingsRepo.update { it.copy(keepAlive = on) } }
             })
@@ -201,7 +230,10 @@ fun SettingsScreen(container: AppContainer) {
             OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Text("Impor") }
         }
         HorizontalDivider()
-        Text("Snapgent Android 0.1 — GPL-3.0. Berdasarkan herdodp/snapgent-connector.", style = MaterialTheme.typography.bodySmall)
+        Text(
+            "Snapgent Android ${BuildConfig.VERSION_NAME} — GPL-3.0. Berdasarkan herdodp/snapgent-connector.",
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 

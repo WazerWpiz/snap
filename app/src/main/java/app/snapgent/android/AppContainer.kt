@@ -31,7 +31,8 @@ import java.util.concurrent.TimeUnit
 
 class AppContainer(private val appContext: Context) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val log = LogBuffer()
+    // scope diteruskan agar snapshot log hanya dibuat saat layar Log mendengarkan.
+    val log = LogBuffer(scope = scope)
     val settingsRepo = SettingsRepository(appContext)
     val webStorage = WebStorage(appContext)
     val approvals = ApprovalCoordinator()

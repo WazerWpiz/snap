@@ -25,7 +25,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class RemoteMcpServer(
@@ -141,8 +140,9 @@ class RemoteMcpServer(
             .header("MCP-Protocol-Version", PROTOCOL_VERSION)
         headers.forEach { (key, value) -> builder.header(key, value) }
         sessionId?.let { builder.header("Mcp-Session-Id", it) }
-        val client = http.newBuilder().callTimeout(timeoutMs, TimeUnit.MILLISECONDS).build()
-        val response = client.newCall(builder.build()).execute()
+        // Pakai client bersama: router sudah membatasi waktu total panggilan
+        // (withTimeout), sehingga tiap request tidak perlu client baru.
+        val response = http.newCall(builder.build()).execute()
         response.header("Mcp-Session-Id")?.let { sessionId = it }
         return response
     }

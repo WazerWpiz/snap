@@ -46,7 +46,7 @@ snap/
 ## Fitur
 
 - Pilih provider (ChatGPT, Claude, Gemini, Kimi, GLM, Arena, Meta AI, Ptero, Grok, Mistral, Qwen, DeepSeek)
-  dan buka beberapa tab sekaligus.
+  dan buka beberapa tab sekaligus. Tab yang tidak tampil otomatis dijeda (`onPause`) agar hemat memori & baterai.
 - Workspace: folder privat aplikasi, atau folder pilihan lewat Storage Access Framework (indikator di bar atas).
 - Manajer MCP: server workspace bawaan (aktif/nonaktif), tambah/hapus/toggle server remote HTTP, tes koneksi.
 - Pengaturan: tema (sistem/terang/gelap), kategori tool, konfirmasi per kategori, override per tool
@@ -114,6 +114,9 @@ Pengaturan dilakukan sepenuhnya di dalam aplikasi (tab **Pengaturan** dan **MCP*
 - **Selektor DOM provider bisa rusak** kapan saja ketika situs berubah. Ini sama dengan upstream.
   Dengan vendor baru, cukup ganti isi `vendor/snapgent-extension/`.
 - **Login provider** dilakukan langsung di WebView; sesi disimpan di penyimpanan WebView aplikasi.
+- **Unggah berkas dari situs (input file)** belum didukung: `onShowFileChooser` belum dipasang, sehingga
+  tombol lampirkan gambar di situs AI belum membuka pemilih berkas. Perbaikan butuh plumbing
+  activity-result; menunggu uji di perangkat nyata.
 - **Penyimpanan kunci/token MCP** disimpan di DataStore (teks biasa dalam sandbox aplikasi). Jangan memasukkan
   token berhak akses penuh tanpa perlu.
 - **Tidak ada tes instrumentasi (UI/WebView).** Tes unit mencakup parser perintah, router, tool workspace,
@@ -134,7 +137,12 @@ Pengaturan dilakukan sepenuhnya di dalam aplikasi (tab **Pengaturan** dan **MCP*
 
 - Build terakhir di CI (run `43798706136`, commit `4b04b84`): **hijau** untuk `lintDebug`, `test testDebugUnitTest`,
   `assembleDebug`, dan `assembleRelease`. APK diunggah sebagai artifact.
-- Sandbox pengembangan tidak memiliki JDK 17 maupun Android SDK, jadi verifikasi resmi dilakukan di CI.
+- Commit berikutnya diverifikasi **penuh** di host arm64 (JDK 17, Android SDK 35): `test`/`testDebugUnitTest`
+  semua modul lolos, `lintDebug` hijau, dan `assembleDebug` + `assembleRelease` menghasilkan APK
+  (`app-debug.apk` 12,2 MB; `app-release.apk` 2,2 MB setelah R8/resource shrinking, ditandatangani
+  debug keystore karena `KEYSTORE_BASE64` kosong). AAPT2 bawaan SDK yang hanya biner x86_64 dijalankan
+  lewat `qemu-x86_64` + sysroot glibc amd64; AGP diarahkan ke biner itu lewat properti Gradle
+  `android.aapt2FromMavenOverride`. Detail resipi ada di catatan skill host, bukan bagian dari repo.
 - Rilis tag `v*` (langkah GitHub Release) belum diuji end-to-end.
 - Perilaku runtime di perangkat (WebView per provider, login, SAF) belum diuji di perangkat nyata.
 

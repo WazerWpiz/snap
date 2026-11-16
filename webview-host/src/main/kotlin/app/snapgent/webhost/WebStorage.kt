@@ -43,6 +43,14 @@ class WebStorage(context: Context) {
         editor.apply()
     }
 
+    /** Hapus kunci (dipakai chrome.storage.local.remove di shim). */
+    fun removeKeys(keys: Collection<String>) {
+        if (keys.isEmpty()) return
+        val editor = prefs.edit()
+        keys.forEach { editor.remove(it) }
+        editor.apply()
+    }
+
     fun exportAll(): Map<String, JsonElement> = snapshot().toMap()
 
     private fun parseOrRaw(raw: String): JsonElement =

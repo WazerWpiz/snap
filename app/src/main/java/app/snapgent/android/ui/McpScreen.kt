@@ -2,12 +2,14 @@
 // Manajer MCP: server bawaan (workspace) dan server remote HTTP. Tambah, hapus, toggle, tes koneksi.
 package app.snapgent.android.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -48,9 +50,13 @@ fun McpScreen(container: AppContainer) {
             Text("Server MCP", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             Button(onClick = { adding = true }) { Text("Tambah remote") }
         }
-        Spacer(Modifier.padding(4.dp))
+        Spacer(Modifier.height(4.dp))
         testResult?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 8.dp))
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
         }
 
         LazyColumn(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
@@ -89,7 +95,7 @@ fun McpScreen(container: AppContainer) {
                                 },
                             )
                         }
-                        Row {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(onClick = {
                                 scope.launch { testResult = "Menguji ${entry.name}..."; testResult = container.testRemote(entry) }
                             }) { Text("Tes koneksi") }
@@ -147,7 +153,7 @@ private fun AddRemoteDialog(onDismiss: () -> Unit, onSave: (RemoteServerEntry) -
             TextButton(enabled = valid, onClick = {
                 onSave(
                     RemoteServerEntry(
-                        id = UUID.randomUUID().toString().take(8),
+                        id = UUID.randomUUID().toString(),
                         name = name.trim(),
                         url = url.trim(),
                         headers = parseHeaders(headers),

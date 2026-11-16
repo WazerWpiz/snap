@@ -13,8 +13,8 @@ data class AppSettings(
     val keepAlive: Boolean = false,
     /** Server workspace bawaan (id "vscode") aktif. */
     val builtinWorkspaceEnabled: Boolean = true,
-    /** none | private | saf */
-    val workspaceKind: String = "none",
+    /** none | private | saf — bawaan "private" (folder privat aplikasi), sesuai README. */
+    val workspaceKind: String = "private",
     val workspaceUri: String? = null,
     val workspaceName: String? = null,
     /** Kategori tool yang diizinkan (wire name dari ToolCategory). */

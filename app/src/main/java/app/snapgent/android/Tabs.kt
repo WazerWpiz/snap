@@ -3,6 +3,7 @@
 package app.snapgent.android
 
 import android.content.Context
+import android.view.ViewGroup
 import android.webkit.WebView
 import app.snapgent.webhost.ChatWebViews
 import app.snapgent.webhost.ExtensionHost
@@ -33,13 +34,30 @@ class ChatTab(val id: String, val site: ProviderSite, container: AppContainer) {
     }
 
     fun reload() {
+        // No-op bila WebView belum pernah dibuat (tab belum pernah tampil).
         view?.reload()
     }
 
+    /**
+     * Jeda/lanjutkan tab: WebView non-aktif berhenti menjalankan JS, animasi, dan video.
+     * Sengaja hanya onPause/onResume (per-view); pauseTimers()/resumeTimers() bersifat
+     * global dan akan menjeda SEMUA WebView, termasuk tab yang sedang tampil.
+     */
+    fun setActive(active: Boolean) {
+        val current = view ?: return
+        if (active) current.onResume() else current.onPause()
+    }
+
     fun destroy() {
-        view?.stopLoading()
-        view?.destroy()
+        val current = view ?: return
         view = null
+        // Lepas dari parent DULU: destroy() pada WebView yang masih menempel
+        // pada hierarki view menyebabkan crash di runtime.
+        (current.parent as? ViewGroup)?.removeView(current)
+        current.stopLoading()
+        current.destroy()
+        // Host tidak boleh lagi menyentuh WebView yang sudah di-destroy.
+        host.detachView()
     }
 }
 
@@ -66,12 +84,22 @@ class ChatTabs(private val container: AppContainer) {
         activeState.value = id
     }
 
+    /** Jalankan tab [id] dan jeda sisanya (dipanggil dari UI setiap tab aktif berubah). */
+    fun activate(id: String?) {
+        tabState.value.forEach { it.setActive(it.id == id) }
+    }
+
     fun close(id: String) {
         val current = tabState.value
         val tab = current.firstOrNull { it.id == id } ?: return
+        val wasActive = activeState.value == id
         tab.destroy()
         val remaining = current.filterNot { it.id == id }
         tabState.value = remaining
-        if (activeState.value == id) activeState.value = remaining.lastOrNull()?.id
+        activeState.value = when {
+            !wasActive -> activeState.value
+            else -> remaining.lastOrNull()?.id
+        }
+        activate(activeState.value)
     }
 }

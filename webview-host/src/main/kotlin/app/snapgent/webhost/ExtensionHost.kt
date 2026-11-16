@@ -9,8 +9,11 @@ import android.webkit.WebView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.json.JSONObject
@@ -27,6 +30,11 @@ class ExtensionHost(
 
     internal fun attachView(webView: WebView) {
         view = webView
+    }
+
+    /** Dipanggil saat WebView tab di-destroy: cegah akses ke view yang sudah mati. */
+    fun detachView() {
+        view = null
     }
 
     /** Dipanggil dari WebViewClient.onPageStarted untuk dokumen utama. */
@@ -62,6 +70,22 @@ class ExtensionHost(
     @JavascriptInterface
     fun storageWrite(json: String) {
         if (isAllowedNow()) storage.putAllJson(json)
+    }
+
+    @JavascriptInterface
+    fun storageRemove(json: String) {
+        if (!isAllowedNow()) return
+        val keys = runCatching { Json.parseToJsonElement(json) }
+            .getOrNull()
+            ?.let { element ->
+                when (element) {
+                    is JsonArray -> element.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                    is JsonPrimitive -> listOfNotNull(element.contentOrNull)
+                    else -> null
+                }
+            }
+            ?: return
+        storage.removeKeys(keys)
     }
 
     @JavascriptInterface
