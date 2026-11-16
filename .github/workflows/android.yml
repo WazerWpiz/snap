@@ -60,11 +60,30 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          set -o pipefail
           chmod +x ./gradlew
-          ./gradlew --no-daemon lintDebug
-          ./gradlew --no-daemon test testDebugUnitTest
-          ./gradlew --no-daemon assembleDebug
-          ./gradlew --no-daemon assembleRelease
+          # --continue: semua tahap dijalankan walau ada yang gagal, agar error terlihat sekaligus.
+          ./gradlew --no-daemon --continue lintDebug 2>&1 | tee build.log
+          ./gradlew --no-daemon --continue test testDebugUnitTest 2>&1 | tee -a build.log
+          ./gradlew --no-daemon --continue assembleDebug 2>&1 | tee -a build.log
+          ./gradlew --no-daemon --continue assembleRelease 2>&1 | tee -a build.log
+
+      - name: Ringkas error build (anotasi)
+        if: failure()
+        run: |
+          grep -E '^e: |What went wrong|^> Task|error:|FAILURE|Could not |Exception' build.log \
+            | sed -e 's#file:///home/runner/work/[^/]*/[^/]*/##' -e 's#^e: ##' \
+            | head -120 \
+            | while IFS= read -r line; do echo "::error::${line}"; done
+
+      - name: Unggah log build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ github.run_number }}
+          path: build.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Unggah APK sebagai artifact
         uses: actions/upload-artifact@v4
